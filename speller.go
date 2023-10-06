@@ -72,7 +72,7 @@ func getArticle(body []byte, tag, keyattr, value string) []string {
 	return article
 }
 
-func speller(artcile []string)
+// func speller(artcile []string)
 
 func main() {
 	// s := `<p>Links:</p><ul><li><a href="foo">Foo!!!</a><li><a href="/bar/baz">This is a test</a></ul>`
@@ -84,7 +84,10 @@ func main() {
 		fmt.Printf("Error getHtmlPage - %v\n", err)
 	}
 	article := getArticle(body, "div", "class", "article__text")
+	articleLen := 0
 	for _, value := range article {
 		fmt.Println(value)
+		articleLen += len(value)
 	}
+	fmt.Println("Total length: ", articleLen)
 }
