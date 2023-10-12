@@ -2,12 +2,21 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/net/html"
 )
+
+type spellOptions struct {
+	lang    string
+	options int
+	format  string
+}
 
 func getHtmlPage(url, userAgent string) ([]byte, error) {
 	client := &http.Client{}
@@ -72,12 +81,33 @@ func getArticle(body []byte, tag, keyattr, value string) []string {
 	return article
 }
 
-// func speller(artcile []string)
+func speller(article []string, opt spellOptions) error {
+	data := url.Values{
+		"name":       {"John Doe"},
+		"occupation": {"gardener"},
+	}
+
+	resp, err := http.PostForm("https://httpbin.org/post", data)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+
+	var res map[string]interface{}
+
+	json.NewDecoder(resp.Body).Decode(&res)
+
+	fmt.Println(res["form"])
+}
 
 func main() {
 	// s := `<p>Links:</p><ul><li><a href="foo">Foo!!!</a><li><a href="/bar/baz">This is a test</a></ul>`
 	url := `https://ria.ru/20231005/moldaviya-1900611273.html`
 	userAgent := `RIA/autotest`
+
+	opt = spellOptions{"ru", 14, "plain"}
 
 	body, err := getHtmlPage(url, userAgent)
 	if err != nil {
@@ -90,4 +120,5 @@ func main() {
 		articleLen += len(value)
 	}
 	fmt.Println("Total length: ", articleLen)
+	err := speller(article, opt)
 }
