@@ -3,16 +3,17 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
-	"log"
+	"io/ioutil"
 	"net/http"
-	"net/url"
 
 	"golang.org/x/net/html"
 )
 
-type spellOptions struct {
+type SpellOptions struct {
+	Article []string
 	lang    string
 	options int
 	format  string
@@ -81,33 +82,43 @@ func getArticle(body []byte, tag, keyattr, value string) []string {
 	return article
 }
 
-func speller(article []string, opt spellOptions) error {
-	data := url.Values{
-		"name":       {"John Doe"},
-		"occupation": {"gardener"},
-	}
+func speller(opt SpellOptions) error {
+	httpposturl := "https://speller.yandex.net/services/spellservice.json/checkTexts"
 
-	resp, err := http.PostForm("https://httpbin.org/post", data)
-
+	context, err := json.Marshal(opt)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Error marshal json context - %v\n", err)
+		return err
 	}
 
-	defer resp.Body.Close()
+	request, err := http.NewRequest("POST", httpposturl, bytes.NewBuffer(context))
+	if err != nil {
+		fmt.Printf("Error NewRequest - %v\n", err)
+	}
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
-	var res map[string]interface{}
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		fmt.Printf("Error doing request - %v\n", err)
+	}
+	defer response.Body.Close()
 
-	json.NewDecoder(resp.Body).Decode(&res)
-
-	fmt.Println(res["form"])
+	body, _ := ioutil.ReadAll(response.Body)
+	fmt.Println("response Status:", response.Status)
+	fmt.Println("response Body:", string(body))
+	return err
 }
 
 func main() {
-	// s := `<p>Links:</p><ul><li><a href="foo">Foo!!!</a><li><a href="/bar/baz">This is a test</a></ul>`
-	url := `https://ria.ru/20231005/moldaviya-1900611273.html`
+	var opt SpellOptions
+	var url string
 	userAgent := `RIA/autotest`
+	flag.StringVar(&opt.lang, "lang", "ru", "language being tested")
+	flag.StringVar(&url, "url", "0", "URL of the article")
+	flag.IntVar(&opt.options, "options", 14, "Publish the article")
 
-	opt = spellOptions{"ru", 14, "plain"}
+	flag.Parse()
 
 	body, err := getHtmlPage(url, userAgent)
 	if err != nil {
@@ -120,5 +131,10 @@ func main() {
 		articleLen += len(value)
 	}
 	fmt.Println("Total length: ", articleLen)
-	err := speller(article, opt)
+
+	error := speller(opt)
+	if error != nil {
+		fmt.Printf("Error speller - %v\n", error)
+	}
+
 }
