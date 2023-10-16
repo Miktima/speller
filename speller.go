@@ -114,11 +114,17 @@ func main() {
 	var opt SpellOptions
 	var url string
 	userAgent := `RIA/autotest`
-	flag.StringVar(&opt.lang, "lang", "ru", "language being tested")
 	flag.StringVar(&url, "url", "0", "URL of the article")
-	flag.IntVar(&opt.options, "options", 14, "Publish the article")
+	flag.StringVar(&opt.lang, "lang", "ru", "Language being tested")
+	flag.IntVar(&opt.options, "options", 14, "Speller options")
+	flag.StringVar(&opt.format, "format", "plain", "Format of the text ")
 
 	flag.Parse()
+
+	if url == "0" {
+		fmt.Println(("URL must be specified"))
+		return
+	}
 
 	body, err := getHtmlPage(url, userAgent)
 	if err != nil {
