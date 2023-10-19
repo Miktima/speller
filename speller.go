@@ -84,7 +84,7 @@ func getArticle(body []byte, tag, keyattr, value string) []string {
 }
 
 func speller(opt SpellOptions) error {
-	httpposturl := "https://speller.yandex.net/services/spellservice.json/checkTexts"
+	httpposturl := "https://speller.yandex.net/services/spellservice.json/checkText"
 	// httpposturl := "https://speller.yandex.net/services/spellservice/checkTexts"
 
 	context, err := json.Marshal(opt)
@@ -92,13 +92,17 @@ func speller(opt SpellOptions) error {
 		fmt.Printf("Error marshal json context - %v\n", err)
 		return err
 	}
+	context = []byte(`{text:По меньшей мере 24 объкта Агенства ООН по делам}`)
+	// context = []byte(`"По меньшей мере 24 объкта Агенства ООН по делам"`)
 	fmt.Println(string(context))
 	request, err := http.NewRequest("POST", httpposturl, bytes.NewBuffer(context))
 	if err != nil {
 		fmt.Printf("Error NewRequest - %v\n", err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
+	// request.Header.Set("Content-Type", "application/json")
+	fmt.Println("request before:", request)
+	fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++")
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
@@ -108,7 +112,9 @@ func speller(opt SpellOptions) error {
 
 	body, _ := ioutil.ReadAll(response.Body)
 	fmt.Println("response Status:", response.Status)
+	fmt.Println("response Headers:", response.Header)
 	fmt.Println("response Body:", string(body))
+	fmt.Println("request:", response.Request)
 	return err
 }
 
@@ -160,7 +166,7 @@ func main() {
 		article := []string{"ЖЕНЕВА, 17 окт - РИА Новости. По меньшей мере 24 объкта Агенства ООН по делам помощи палестинским беженцам и организации работ (БАПОР) были повреждены в результате израильских ударов и бомбардировок по всему сектору Газа с 7 октября, и реальная цифра, вероятно, выше, говорится в опубликованном отчете на сайте организации."}
 		articleLen := 0
 		for _, value := range article {
-			fmt.Println(value)
+			// fmt.Println(value)
 			articleLen += len(value)
 		}
 		opt.Article = article
