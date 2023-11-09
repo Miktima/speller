@@ -9,15 +9,27 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"golang.org/x/net/html"
 )
 
 type SpellOptions struct {
-	Article []string
+	Article string
 	Lang    string
 	Options int
 	Format  string
+}
+
+type SpellError struct {
+	Code int
+	Pos  int
+	Row  int
+	Col  int
+	Len  int
+	Word string
+	S    []string
 }
 
 func getHtmlPage(url, userAgent string) ([]byte, error) {
@@ -47,10 +59,10 @@ func getHtmlPage(url, userAgent string) ([]byte, error) {
 	return body, nil
 }
 
-func getArticle(body []byte, tag, keyattr, value string) []string {
+func getArticle(body []byte, tag, keyattr, value string) string {
 	tkn := html.NewTokenizer(bytes.NewReader(body))
 	depth := 0
-	var article []string
+	var article string
 	block := ""
 	errorCode := false
 
@@ -73,7 +85,7 @@ func getArticle(body []byte, tag, keyattr, value string) []string {
 					}
 				} else if tt == html.EndTagToken && depth >= 1 {
 					depth--
-					article = append(article, block)
+					article += block
 					block = ""
 				}
 			}
@@ -83,26 +95,17 @@ func getArticle(body []byte, tag, keyattr, value string) []string {
 	return article
 }
 
-func speller(opt SpellOptions) error {
+func speller(opt SpellOptions) ([]SpellError, error) {
 	httpposturl := "https://speller.yandex.net/services/spellservice.json/checkText"
-	// httpposturl := "https://speller.yandex.net/services/spellservice/checkTexts"
 
-	context, err := json.Marshal(opt)
-	if err != nil {
-		fmt.Printf("Error marshal json context - %v\n", err)
-		return err
-	}
-	context = []byte(`{text:По меньшей мере 24 объкта Агенства ООН по делам}`)
-	// context = []byte(`"По меньшей мере 24 объкта Агенства ООН по делам"`)
-	fmt.Println(string(context))
+	context := []byte("text=" + url.QueryEscape(opt.Article) + "&lang=" + url.QueryEscape(opt.Lang) + "&options=" + strconv.Itoa(opt.Options) + "&format=" + opt.Format)
+	// fmt.Println("Len context: ", len(context))
 	request, err := http.NewRequest("POST", httpposturl, bytes.NewBuffer(context))
 	if err != nil {
 		fmt.Printf("Error NewRequest - %v\n", err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	// request.Header.Set("Content-Type", "application/json")
-	fmt.Println("request before:", request)
-	fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++")
+	// fmt.Println("request before:", request)
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
@@ -110,12 +113,19 @@ func speller(opt SpellOptions) error {
 	}
 	defer response.Body.Close()
 
+	var sperror []SpellError
+	// fmt.Println("Article:", opt.Article)
 	body, _ := ioutil.ReadAll(response.Body)
-	fmt.Println("response Status:", response.Status)
-	fmt.Println("response Headers:", response.Header)
-	fmt.Println("response Body:", string(body))
-	fmt.Println("request:", response.Request)
-	return err
+	// fmt.Println("response Status:", response.Status)
+	// fmt.Println("response Headers:", response.Header)
+	// fmt.Println("response Body:", string(body))
+
+	err = json.Unmarshal(body, &sperror)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	return sperror, err
 }
 
 func main() {
@@ -146,7 +156,7 @@ func main() {
 	userAgent := `RIA/autotest`
 	flag.StringVar(&url, "url", "0", "URL of the article")
 	flag.StringVar(&urlList, "xml", "0", "XML with list of the articles")
-	flag.StringVar(&opt.Lang, "lang", "ru", "Language being tested")
+	flag.StringVar(&opt.Lang, "lang", "ru,en", "Language being tested")
 	flag.IntVar(&opt.Options, "options", 14, "Speller options")
 	flag.StringVar(&opt.Format, "format", "plain", "Format of the text ")
 
@@ -158,21 +168,30 @@ func main() {
 	}
 
 	if url != "0" {
-		// body, err := getHtmlPage(url, userAgent)
-		// if err != nil {
-		// 	fmt.Printf("Error getHtmlPage - %v\n", err)
-		// }
-		// article := getArticle(body, "div", "class", "article__text")
-		article := []string{"ЖЕНЕВА, 17 окт - РИА Новости. По меньшей мере 24 объкта Агенства ООН по делам помощи палестинским беженцам и организации работ (БАПОР) были повреждены в результате израильских ударов и бомбардировок по всему сектору Газа с 7 октября, и реальная цифра, вероятно, выше, говорится в опубликованном отчете на сайте организации."}
-		articleLen := 0
-		for _, value := range article {
-			// fmt.Println(value)
-			articleLen += len(value)
+		body, err := getHtmlPage(url, userAgent)
+		if err != nil {
+			fmt.Printf("Error getHtmlPage - %v\n", err)
 		}
+		article := getArticle(body, "div", "class", "article__text")
+		// article := `
+		// 	ЖЕНЕВА, 17 окт - РИА Новости. По меньшей мере 24 объкта Агенства ООН по делам помощи палестинским
+		// 	беженцам и организации работ (БАПОР) были повреждены в результате израильских ударов и бомбардировок по всему сектору Газа с
+		// 	 7 октября, и реальная цифра, вероятно, выше, говорится в опубликованном отчете на сайте организации.
+		// `
+		articleLen := len(article)
+
 		opt.Article = article
-		error := speller(opt)
-		if error != nil {
-			fmt.Printf("Error speller - %v\n", error)
+		fmt.Println("Article length: ", articleLen)
+
+		sperror, err := speller(opt)
+		if err != nil {
+			fmt.Printf("Error speller - %v\n", err)
+		}
+		if len(sperror) > 0 {
+			fmt.Println("Article: ", article)
+			for _, v := range sperror {
+				fmt.Printf("Incoorect world: %v\n", v.Word)
+			}
 		}
 	} else if urlList != "0" {
 		rss := new(RiaRss)
@@ -192,16 +211,19 @@ func main() {
 				fmt.Printf("Error getHtmlPage - %v\n", err)
 			}
 			article := getArticle(body, "div", "class", "article__text")
-			articleLen := 0
-			for _, value := range article {
-				fmt.Println(value)
-				articleLen += len(value)
-			}
+			articleLen := len(article)
 			fmt.Println("Total length: ", articleLen)
 
-			error := speller(opt)
-			if error != nil {
-				fmt.Printf("Error speller - %v\n", error)
+			opt.Article = article
+			sperror, err_sp := speller(opt)
+			if len(sperror) > 0 {
+				fmt.Println("Article: ", article)
+				for _, v := range sperror {
+					fmt.Printf("Incoorect world: %v\n", v.Word)
+				}
+			}
+			if err_sp != nil {
+				fmt.Printf("Error speller - %v\n", err_sp)
 			}
 		}
 	}
