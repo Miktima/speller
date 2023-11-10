@@ -173,11 +173,6 @@ func main() {
 			fmt.Printf("Error getHtmlPage - %v\n", err)
 		}
 		article := getArticle(body, "div", "class", "article__text")
-		// article := `
-		// 	ЖЕНЕВА, 17 окт - РИА Новости. По меньшей мере 24 объкта Агенства ООН по делам помощи палестинским
-		// 	беженцам и организации работ (БАПОР) были повреждены в результате израильских ударов и бомбардировок по всему сектору Газа с
-		// 	 7 октября, и реальная цифра, вероятно, выше, говорится в опубликованном отчете на сайте организации.
-		// `
 		articleLen := len(article)
 
 		opt.Article = article
@@ -188,10 +183,13 @@ func main() {
 			fmt.Printf("Error speller - %v\n", err)
 		}
 		if len(sperror) > 0 {
-			fmt.Println("Article: ", article)
+			var article_err string
+			// fmt.Println("Article: ", article)
 			for _, v := range sperror {
-				fmt.Printf("Incoorect world: %v\n", v.Word)
+				article_err = article[:v.Pos] + "--->" + article[v.Pos+1:v.Pos+v.Len] + "<---" + article[v.Pos+v.Len+1:]
+				fmt.Printf("Incorrect world: %v, pos: %v, len: %v\n", v.Word, v.Pos, v.Len)
 			}
+			fmt.Println("Article with errors: ", article_err)
 		}
 	} else if urlList != "0" {
 		rss := new(RiaRss)
