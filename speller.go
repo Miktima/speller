@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 
 	"golang.org/x/net/html"
@@ -128,6 +129,18 @@ func speller(opt SpellOptions) ([]SpellError, error) {
 	return sperror, err
 }
 
+func addtags(article string, subs []string, sperror []SpellError) string {
+	article_err := ""
+	ar := []rune(article)
+	startPos := 0
+	for _, v := range sperror {
+		article_err += string(ar[startPos:v.Pos]) + subs[0] + string(ar[v.Pos:v.Pos+v.Len]) + subs[1]
+		startPos = v.Pos + v.Len
+	}
+	article_err += string(ar[startPos:])
+	return article_err
+}
+
 func main() {
 	var opt SpellOptions
 	var url string
@@ -153,6 +166,18 @@ func main() {
 		} `xml:"channel"`
 	}
 
+	subs_cl := []string{"<mark>", "</mark>"}
+
+	html_head := `<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<title>Article errors</title>
+	</head>
+	<body>`
+
 	userAgent := `RIA/autotest`
 	flag.StringVar(&url, "url", "0", "URL of the article")
 	flag.StringVar(&urlList, "xml", "0", "XML with list of the articles")
@@ -166,6 +191,8 @@ func main() {
 		fmt.Println(("URL or XML must be specified"))
 		return
 	}
+
+	var htmlerr string
 
 	if url != "0" {
 		body, err := getHtmlPage(url, userAgent)
@@ -183,13 +210,18 @@ func main() {
 			fmt.Printf("Error speller - %v\n", err)
 		}
 		if len(sperror) > 0 {
-			var article_err string
-			// fmt.Println("Article: ", article)
+			article_err := addtags(article, subs_cl, sperror)
+			htmlerr = "<p>Link to the article: <a href='" + url + "'>" + url + "</a></p>\n"
 			for _, v := range sperror {
-				article_err = article[:v.Pos] + "--->" + article[v.Pos+1:v.Pos+v.Len] + "<---" + article[v.Pos+v.Len+1:]
 				fmt.Printf("Incorrect world: %v, pos: %v, len: %v\n", v.Word, v.Pos, v.Len)
+				htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v</p>\n", v.Word, v.Pos, v.Len)
 			}
-			fmt.Println("Article with errors: ", article_err)
+			fmt.Println("Article with errors:", article_err)
+			htmlerr += "<p>" + article_err + "</p>\n"
+			err := os.WriteFile("error.html", []byte(html_head+htmlerr+"</body>"), 0644)
+			if err != nil {
+				fmt.Printf("Error write HTML file - %v\n", err)
+			}
 		}
 	} else if urlList != "0" {
 		rss := new(RiaRss)
@@ -202,6 +234,7 @@ func main() {
 			fmt.Printf("error: %v", err1)
 			return
 		}
+		var article_err string
 		for _, value := range rss.Channel.Item {
 			fmt.Println("========>", value.Link)
 			body, err := getHtmlPage(value.Link, userAgent)
@@ -215,14 +248,30 @@ func main() {
 			opt.Article = article
 			sperror, err_sp := speller(opt)
 			if len(sperror) > 0 {
-				fmt.Println("Article: ", article)
+				article_err = addtags(article, subs_cl, sperror)
+				htmlerr += "<p>Link to the article: <a href='" + url + "'>" + url + "</a></p>\n"
 				for _, v := range sperror {
-					fmt.Printf("Incoorect world: %v\n", v.Word)
+					fmt.Printf("Incorrect world: %v, pos: %v, len: %v\n", v.Word, v.Pos, v.Len)
+					htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v</p>\n", v.Word, v.Pos, v.Len)
 				}
+				fmt.Println("Article with errors:", article_err)
+				htmlerr += "<p>" + article_err + "</p><br><br>\n"
 			}
 			if err_sp != nil {
 				fmt.Printf("Error speller - %v\n", err_sp)
 			}
+		}
+		if len(htmlerr) > 0 {
+			err := os.WriteFile("error.html", []byte(html_head+htmlerr+"</body>"), 0644)
+			if err != nil {
+				fmt.Printf("Error write HTML file - %v\n", err)
+			}
+		}
+	}
+	if len(htmlerr) == 0 {
+		err := os.WriteFile("error.html", []byte(html_head+"<p>Errors not found</p></body>"), 0644)
+		if err != nil {
+			fmt.Printf("Error write HTML file - %v\n", err)
 		}
 	}
 }
