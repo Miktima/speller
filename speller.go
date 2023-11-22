@@ -250,8 +250,8 @@ func main() {
 		if len(sperror) > 0 {
 			article_err := addtags(article, subs_cl, sperror)
 			for _, v := range sperror {
-				fmt.Printf("Incorrect world: %v, pos: %v, len: %v\n", v.Word, v.Pos, v.Len)
-				htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v</p>\n", v.Word, v.Pos, v.Len)
+				fmt.Printf("Incorrect world: %v, pos: %v, len: %v, code: %v\n", v.Word, v.Pos, v.Len, v.Code)
+				htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, code: %v</p>\n", v.Word, v.Pos, v.Len, v.Code)
 			}
 			fmt.Println("Article with errors: ", article_err)
 			htmlerr += "<p>" + article_err + "</p>\n"
@@ -301,8 +301,8 @@ func main() {
 			if len(sperror) > 0 {
 				article_err = addtags(article, subs_cl, sperror)
 				for _, v := range sperror {
-					fmt.Printf("Incorrect world: %v, pos: %v, len: %v\n", v.Word, v.Pos, v.Len)
-					htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v</p>\n", v.Word, v.Pos, v.Len)
+					fmt.Printf("Incorrect world: %v, pos: %v, len: %v, code: %v\n", v.Word, v.Pos, v.Len, v.Code)
+					htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, code: %v</p>\n", v.Word, v.Pos, v.Len, v.Code)
 				}
 				fmt.Println("Article with errors:", article_err)
 				htmlerr += "<p>" + article_err + "</p>\n"
