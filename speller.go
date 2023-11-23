@@ -193,6 +193,14 @@ func main() {
 		} `xml:"channel"`
 	}
 
+	// Error codes of the Yandex speller (https://yandex.ru/dev/speller/doc/ru/reference/error-codes)
+	errorCode := map[int]string{
+		1: "Слова нет в словаре",
+		2: "Повтор слова",
+		3: "Неверное употребление прописных и строчных букв",
+		4: "Текст содержит слишком много ошибок",
+	}
+
 	// Теги для выделения ошибок
 	subs_cl := []string{"<mark>", "</mark>"}
 
@@ -250,8 +258,8 @@ func main() {
 		if len(sperror) > 0 {
 			article_err := addtags(article, subs_cl, sperror)
 			for _, v := range sperror {
-				fmt.Printf("Incorrect world: %v, pos: %v, len: %v, code: %v\n", v.Word, v.Pos, v.Len, v.Code)
-				htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, code: %v</p>\n", v.Word, v.Pos, v.Len, v.Code)
+				fmt.Printf("Incorrect world: %v, pos: %v, len: %v, error: %v\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
+				htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, error: %v</p>\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
 			}
 			fmt.Println("Article with errors: ", article_err)
 			htmlerr += "<p>" + article_err + "</p>\n"
@@ -301,8 +309,8 @@ func main() {
 			if len(sperror) > 0 {
 				article_err = addtags(article, subs_cl, sperror)
 				for _, v := range sperror {
-					fmt.Printf("Incorrect world: %v, pos: %v, len: %v, code: %v\n", v.Word, v.Pos, v.Len, v.Code)
-					htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, code: %v</p>\n", v.Word, v.Pos, v.Len, v.Code)
+					fmt.Printf("Incorrect world: %v, pos: %v, len: %v, error: %v\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
+					htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, error: %v</p>\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
 				}
 				fmt.Println("Article with errors:", article_err)
 				htmlerr += "<p>" + article_err + "</p>\n"
