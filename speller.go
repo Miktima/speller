@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -33,6 +34,11 @@ type SpellError struct {
 	Len  int
 	Word string
 	S    []string
+}
+
+//Структура для данных статей
+type NewsDataSp struct {
+	URL, Article string
 }
 
 func getHtmlPage(url, userAgent string) ([]byte, error) {
@@ -166,11 +172,27 @@ func addtags(article string, subs []string, sperror []SpellError) string {
 	return article_err
 }
 
+func inSlice(tSlice []NewsDataSp, url string) bool {
+	// Проверка содержится ли URL в срезе
+	for _, v := range tSlice {
+		if v.URL == url {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	var opt SpellOptions
 	var url string
 	var urlList string
 	var userAgent string
+	var collect int
+	var listDataNews []NewsDataSp
+	var dataNews NewsDataSp
+
+	errorFile := "error.html"
+	dataFile := "datanewssp.json"
 
 	// XML structure of RSS
 	type RiaRss struct {
@@ -222,8 +244,30 @@ func main() {
 	flag.IntVar(&opt.Options, "options", 14, "Speller options")
 	flag.StringVar(&opt.Format, "format", "plain", "Format of the text ")
 	flag.StringVar(&userAgent, "uagent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit", "User Agent")
+	flag.IntVar(&collect, "collect", 0, "Collect articles with codes 2 and 3 (=1) or not (=0)")
 
 	flag.Parse()
+
+	path, _ := os.Executable()
+	path = path[:strings.LastIndex(path, "/")+1]
+
+	if collect == 1 {
+		// Читаем файл с сохраненными статьями
+		if _, err := os.Stat(path + dataFile); err == nil {
+			// Open our jsonFile
+			byteValue, err := os.ReadFile(path + dataFile)
+			// if we os.ReadFile returns an error then handle it
+			if err != nil {
+				fmt.Println(err)
+			}
+			// defer the closing of our jsonFile so that we can parse it later on
+			// var listHash []ArticleH
+			err = json.Unmarshal(byteValue, &listDataNews)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
 
 	// Если не указан url и xml выходим: проверять нечего
 	if url == "0" && urlList == "0" {
@@ -232,6 +276,7 @@ func main() {
 	}
 
 	var htmlerr string
+	colErr := 0
 
 	// Проверка для единичного адреса
 	if url != "0" {
@@ -241,7 +286,8 @@ func main() {
 			fmt.Printf("Error getHtmlPage - %v\n", err)
 		}
 		// Получаем текст статьи
-		article := getArticle(body, "div", "class", "article__text")
+		article := getArticle(body, "div", "class", "article__title") + "\n"
+		article += getArticle(body, "div", "class", "article__text")
 		articleLen := len(article)
 
 		// Сведения о статье
@@ -260,14 +306,25 @@ func main() {
 			for _, v := range sperror {
 				fmt.Printf("Incorrect world: %v, pos: %v, len: %v, error: %v\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
 				htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, error: %v</p>\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
+				if v.Code == 2 || v.Code == 3 {
+					colErr = 1
+				}
 			}
 			fmt.Println("Article with errors: ", article_err)
 			htmlerr += "<p>" + article_err + "</p>\n"
-			// Выводим результат ы проверки в файл
-			err := os.WriteFile("error.html", []byte(html_head+htmlerr+"</body>"), 0644)
+			// Выводим результаты проверки в файл
+			err := os.WriteFile(errorFile, []byte(html_head+htmlerr+"</body>"), 0644)
 			if err != nil {
 				fmt.Printf("Error write HTML file - %v\n", err)
 			}
+		}
+		if colErr == 1 && collect == 1 {
+			if !inSlice(listDataNews, url) {
+				dataNews.URL = url
+				dataNews.Article = article
+				listDataNews = append(listDataNews, dataNews)
+			}
+			colErr = 0
 		}
 		htmlerr += "<br><br>\n"
 	} else if urlList != "0" {
@@ -297,7 +354,8 @@ func main() {
 				fmt.Printf("Error getHtmlPage - %v\n", err)
 			}
 			// Получаем текст статьи
-			article := getArticle(body, "div", "class", "article__text")
+			article := getArticle(body, "div", "class", "article__title") + "\n"
+			article = getArticle(body, "div", "class", "article__text")
 			articleLen := len(article)
 			fmt.Println("Total length: ", articleLen)
 			htmlerr += "<p>Article length: " + strconv.Itoa(articleLen) + "</p>\n"
@@ -311,6 +369,9 @@ func main() {
 				for _, v := range sperror {
 					fmt.Printf("Incorrect world: %v, pos: %v, len: %v, error: %v\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
 					htmlerr += fmt.Sprintf("<p>Incorrect world: %v, pos: %v, len: %v, error: %v</p>\n", v.Word, v.Pos, v.Len, errorCode[v.Code])
+					if v.Code == 2 || v.Code == 3 {
+						colErr = 1
+					}
 				}
 				fmt.Println("Article with errors:", article_err)
 				htmlerr += "<p>" + article_err + "</p>\n"
@@ -318,12 +379,36 @@ func main() {
 			if err_sp != nil {
 				fmt.Printf("Error speller - %v\n", err_sp)
 			}
+			if colErr == 1 && collect == 1 {
+				if !inSlice(listDataNews, url) {
+					dataNews.URL = value.Link
+					dataNews.Article = article
+					listDataNews = append(listDataNews, dataNews)
+				}
+				colErr = 0
+			}
 			htmlerr += "<br><br>\n"
 		}
 		htmlerr += "<p>Total article length: " + strconv.Itoa(totalLng) + "</p>\n"
-		err = os.WriteFile("error.html", []byte(html_head+htmlerr+"</body>"), 0644)
+		err = os.WriteFile(path+errorFile, []byte(html_head+htmlerr+"</body>"), 0644)
 		if err != nil {
 			fmt.Printf("Error write HTML file - %v\n", err)
+		}
+		if collect == 1 {
+			//записываем данные в файл, если они есть
+			if len(listDataNews) > 0 {
+				f, err := os.OpenFile(path+dataFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+				if err != nil {
+					fmt.Printf("Error opening to %v file - %v\n", dataFile, err)
+				}
+				defer f.Close()
+
+				arData, _ := json.MarshalIndent(listDataNews, "", " ")
+				_, err = f.Write(arData)
+				if err != nil {
+					fmt.Printf("Error write Article data - %v\n", err)
+				}
+			}
 		}
 	}
 }
