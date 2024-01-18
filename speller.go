@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/html"
 )
@@ -36,7 +37,7 @@ type SpellError struct {
 	S    []string
 }
 
-//Структура для данных статей
+// Структура для данных статей
 type NewsDataSp struct {
 	URL, Article string
 }
@@ -390,7 +391,9 @@ func main() {
 			htmlerr += "<br><br>\n"
 		}
 		htmlerr += "<p>Total article length: " + strconv.Itoa(totalLng) + "</p>\n"
-		err = os.WriteFile(path+errorFile, []byte(html_head+htmlerr+"</body>"), 0644)
+		ts := time.Now().UTC().Format(time.RFC3339)
+		ts_string := strings.Replace(strings.Replace(ts, ":", "", -1), "-", "", -1)
+		err = os.WriteFile(path+ts_string+errorFile, []byte(html_head+htmlerr+"</body>"), 0644)
 		if err != nil {
 			fmt.Printf("Error write HTML file - %v\n", err)
 		}
